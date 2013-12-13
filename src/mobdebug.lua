@@ -1018,11 +1018,41 @@ local function off()
 end
 
 -- Handles server debugging commands 
+local debugged_files = {}
+local get_context = function(file,lineno)
+    local lineno = tonumber(lineno)
+    local freader = function(file)
+        local lines = {}
+        for line in io.lines(file) do
+            table.insert(lines,line)
+        end
+        debugged_files[file] = lines
+        return debugged_files[file]
+    end
+    local lines = debugged_files[file] or freader(file)
+    local context = {}
+    for i=math.max(lineno-5,1),math.min(lineno+5,#lines) do
+        if i==lineno then
+            table.insert(context,string.format('-->  %s',lines[i]))
+        else
+            table.insert(context,string.format('%3d  %s',i,lines[i]))
+        end
+    end
+    return table.concat(context,'\n')
+end
 local function handle(params, client, options)
   local _, _, command = string.find(params, "^([a-z]+)")
   local file, line, watch_idx
+  if command == 'r' then command = 'run' end
+  if command == 's' then command = 'step' end
+  if command == 'c' then command = 'run' end
+  if command == 'n' then command = 'over' end
+  if command == 'o' then command = 'out' end
+  if command == 'b' then command = 'setb' end
+  if command == 'p' then command = 'eval' end
   if command == "run" or command == "step" or command == "out"
   or command == "over" or command == "exit" then
+
     client:send(string.upper(command) .. "\n")
     client:receive() -- this should consume the first '200 OK' response
     while true do
@@ -1040,11 +1070,13 @@ local function handle(params, client, options)
         _, _, file, line = string.find(breakpoint, "^202 Paused%s+(.-)%s+(%d+)%s*$")
         if file and line then
           print("Paused at file " .. file .. " line " .. line)
+          print(get_context(file,line))
         end
       elseif status == "203" then
         _, _, file, line, watch_idx = string.find(breakpoint, "^203 Paused%s+(.-)%s+(%d+)%s+(%d+)%s*$")
         if file and line and watch_idx then
           print("Paused at file " .. file .. " line " .. line .. " (watch expression " .. watch_idx .. ": [" .. watches[watch_idx] .. "])")
+          print(get_context(file,line))
         end
       elseif status == "204" then
         local _, _, stream, size = string.find(breakpoint, "^204 Output (%w+) (%d+)$")
@@ -1332,26 +1364,26 @@ local function handle(params, client, options)
       print(basedir)
     end
   elseif command == "help" then
-    print("setb <file> <line>    -- sets a breakpoint")
-    print("delb <file> <line>    -- removes a breakpoint")
-    print("delallb               -- removes all breakpoints")
-    print("setw <exp>            -- adds a new watch expression")
-    print("delw <index>          -- removes the watch expression at index")
-    print("delallw               -- removes all watch expressions")
-    print("run                   -- runs until next breakpoint")
-    print("step                  -- runs until next line, stepping into function calls")
-    print("over                  -- runs until next line, stepping over function calls")
-    print("out                   -- runs until line after returning from current function")
-    print("listb                 -- lists breakpoints")
-    print("listw                 -- lists watch expressions")
-    print("eval <exp>            -- evaluates expression on the current context and returns its value")
-    print("exec <stmt>           -- executes statement on the current context")
-    print("load <file>           -- loads a local file for debugging")
-    print("reload                -- restarts the current debugging session")
-    print("stack                 -- reports stack trace")
-    print("output stdout <d|c|r> -- capture and redirect io stream (default|copy|redirect)")
-    print("basedir [<path>]      -- sets the base path of the remote application, or shows the current one")
-    print("exit                  -- exits debugger")
+    print("(b) setb <file> <line>    -- sets a breakpoint")
+    print("    delb <file> <line>    -- removes a breakpoint")
+    print("    delallb               -- removes all breakpoints")
+    print("    setw <exp>            -- adds a new watch expression")
+    print("    delw <index>          -- removes the watch expression at index")
+    print("    delallw               -- removes all watch expressions")
+    print("(c) run                   -- runs until next breakpoint")
+    print("(s) step                  -- runs until next line, stepping into function calls")
+    print("(n) over                  -- runs until next line, stepping over function calls")
+    print("(o) out                   -- runs until line after returning from current function")
+    print("    listb                 -- lists breakpoints")
+    print("    listw                 -- lists watch expressions")
+    print("(p) eval <exp>            -- evaluates expression on the current context and returns its value")
+    print("    exec <stmt>           -- executes statement on the current context")
+    print("    load <file>           -- loads a local file for debugging")
+    print("    reload                -- restarts the current debugging session")
+    print("    stack                 -- reports stack trace")
+    print("    output stdout <d|c|r> -- capture and redirect io stream (default|copy|redirect)")
+    print("    basedir [<path>]      -- sets the base path of the remote application, or shows the current one")
+    print("    exit                  -- exits debugger")
   else
     local _, _, spaces = string.find(params, "^(%s*)$")
     if not spaces then
