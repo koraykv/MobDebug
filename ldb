@@ -1,0 +1,8 @@
+#!/bin/sh
+
+## This is still a hack, there is no guarantee that there won't be a race condition and this will fail, but most probably it will be fine for a while :)
+export MOBDEBUG_PORT=-1
+A=`qth -onethread -l socket -e  'local p = socket.bind("*",0); local ip,port = p:getsockname();print("export MOBDEBUG_PORT="..port);p=nil;' | grep export`
+eval $A
+qth -onethread -e  "print('Client Using port=' .. os.getenv('MOBDEBUG_PORT'));os.execute('sleep 1');require('mobdebug').start()" $@ &
+exec qth -onethread -e "print('Server Using port=' .. os.getenv('MOBDEBUG_PORT'));require('mobdebug').listen()"
