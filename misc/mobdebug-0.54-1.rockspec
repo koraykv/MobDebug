@@ -42,7 +42,8 @@ dependencies = {
 build = {
    type = "none",
    install = {
-      lua = { ["mobdebug"] = "src/mobdebug.lua" }
+      lua = { ["mobdebug"] = "src/mobdebug.lua" },
+      bin = { "ldb" }
    },
    copy_directories = { "examples" }
 }
